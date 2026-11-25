@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberLudo 3D | Futuristic Neon WebRTC Arena</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 for High-End 3D Board, Tokens & Holographic Dice -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- PeerJS for Serverless WebRTC P2P Multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- Google Fonts: Orbitron & Rajdhani -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #020617;
+            color: #f8fafc;
+            user-select: none;
+        }
+
+        .font-cyber {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #ludo-3d-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            z-index: 0;
+            cursor: grab;
+        }
+        #ludo-3d-canvas:active {
+            cursor: grabbing;
+        }
+
+        /* Futuristic Holographic Glass Panels */
+        .holo-panel {
+            background: rgba(6, 12, 28, 0.82);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1.5px solid rgba(56, 189, 248, 0.42);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), inset 0 0 24px rgba(56, 189, 248, 0.12);
+        }
+
+        .holo-card {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            transition: all 0.18s ease;
+        }
+        .holo-card:hover {
+            border-color: #38bdf8;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.22);
+        }
+
+        .btn-neon {
+            transition: transform 0.12s ease, box-shadow 0.15s ease;
+        }
+        .btn-neon:active:not(:disabled) {
+            transform: translateY(3px);
+            box-shadow: none !important;
+        }
+
+        @keyframes pulseBorderCyan {
+            0%, 100% { box-shadow: 0 0 0 2px #22d3ee, 0 0 22px rgba(34, 211, 238, 0.7); }
+            50% { box-shadow: 0 0 0 4px #a5f3fc, 0 0 36px rgba(34, 211, 238, 1); }
+        }
+        .active-turn-ring {
+            animation: pulseBorderCyan 1.8s infinite;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.55);
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- =========================================================================
+         1. FULL-VIEWPORT 3D THREE.JS FUTURISTIC LUDO ARENA CANVAS
+         ========================================================================= -->
+    <canvas id="ludo-3d-canvas"></canvas>
+
+    <!-- =========================================================================
+         2. TOP FUTURISTIC HUD BAR (CAMERA PRESETS, SCENIC VIEW, PING & AUDIO)
+         ========================================================================= -->
+    <header class="fixed top-0 left-0 right-0 z-30 px-3 md:px-6 pt-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <div class="pointer-events-auto flex items-center gap-2.5 bg-slate-950/90 backdrop-blur px-3.5 py-1.5 rounded-full border border-cyan-400/60 shadow-lg">
+            <span class="text-lg">🎲</span>
+            <span class="font-cyber font-extrabold text-cyan-300 text-xs md:text-sm tracking-wider">CYBERLUDO 3D</span>
+            <span class="hidden sm:inline-block bg-fuchsia-500/20 border border-fuchsia-400 text-fuchsia-300 text-[10px] font-cyber font-bold px-2 py-0.5 rounded-full">NEON ARENA</span>
+        </div>
+
+        <div class="pointer-events-auto flex items-center gap-2">
+            <!-- Camera Angle Toggle (3D Isometric vs Top-Down Tactical) -->
+            <button onclick="cycleCameraPreset()" class="bg-slate-950/90 hover:bg-slate-900 text-amber-300 font-bold px-3 py-1.5 rounded-full border border-amber-400/50 text-xs flex items-center gap-1.5 transition" title="Switch 3D Camera Angle">
+                <i class="fa-solid fa-video"></i>
+                <span id="cam-preset-label" class="hidden sm:inline">3D Orbit</span>
+            </button>
+
+            <!-- Scenic Board Preview Toggle -->
+            <button id="btn-scenic" onclick="toggleScenicView()" class="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 font-bold px-3.5 py-1.5 rounded-full border border-cyan-400/50 text-xs flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-cube"></i>
+                <span id="scenic-text">3D Board View</span>
+            </button>
+
+            <!-- Live WebRTC Ping -->
+            <div id="ping-badge" class="hidden items-center gap-1.5 bg-slate-950/90 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/50 text-xs font-cyber font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span id="ping-text">P2P 19ms</span>
+            </div>
+
+            <!-- Sound Toggle -->
+            <button onclick="toggleSound()" class="bg-slate-950/90 hover:bg-slate-900 text-cyan-300 w-9 h-9 rounded-full border border-cyan-500/40 flex items-center justify-center transition" title="Toggle Synth Audio">
+                <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+            </button>
+
+            <!-- Exit Match -->
+            <button id="btn-exit-match" onclick="openConfirmExit()" class="hidden bg-rose-600/90 hover:bg-rose-500 text-white font-bold px-3 py-1.5 rounded-full border border-rose-300/60 text-xs items-center gap-1.5 transition">
+                <i class="fa-solid fa-power-off"></i>
+                <span class="hidden sm:inline">Exit</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Return Pill when Inspecting 3D Board -->
+    <div id="scenic-return-pill" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 holo-panel px-5 py-3 rounded-full border border-cyan-400">
+        <span class="text-cyan-200 text-xs md:text-sm font-bold">Drag mouse/touch to orbit the 3D Neon Ludo Arena</span>
+        <button onclick="toggleScenicView()" class="px-4 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-cyber font-extrabold text-xs rounded-full">
+            Open Lobby 🎲
+        </button>
+    </div>
+
+    <!-- =========================================================================
+         3. LOBBY OVERLAY (1v1 WEBRTC ROOM CODE/LINK OR LOCAL / CYBER-AI ARENA)
+         ========================================================================= -->
+    <main id="lobby-overlay" class="fixed inset-0 z-20 flex items-center justify-center p-3 md:p-5 overflow-y-auto">
+        <div class="holo-panel w-full max-w-4xl rounded-3xl p-5 md:p-7 my-auto">
+            <div class="text-center mb-4">
+                <div class="inline-flex items-center gap-2 bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-[11px] font-cyber font-bold uppercase tracking-widest px-3.5 py-1 rounded-full mb-1.5">
+                    <span>⚡ WebGL 3D Neon Board</span>
+                    <span>•</span>
+                    <span>Physics Holo-Dice</span>
+                    <span>•</span>
+                    <span>WebRTC P2P</span>
+                </div>
+                <h1 class="font-cyber text-3xl md:text-5xl font-black tracking-tight text-white">
+                    CYBER<span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300">LUDO 3D</span>
+                </h1>
+                <p class="text-slate-300 text-sm md:text-base font-medium mt-1">
+                    Command plasma tokens across a 3D orbital grid—capture rivals, claim Star Shields, and ascend to the Core!
+                </p>
+            </div>
+
+            <!-- Mode Selector Tabs -->
+            <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-900/90 border border-slate-700 rounded-2xl max-w-md mx-auto mb-5">
+                <button id="tab-webrtc" onclick="setLobbyMode('webrtc')" class="py-2 px-3 rounded-xl font-bold text-xs md:text-sm bg-cyan-400 text-slate-950 shadow transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wifi"></i>
+                    <span>1v1 Live WebRTC</span>
+                </button>
+                <button id="tab-local" onclick="setLobbyMode('local')" class="py-2 px-3 rounded-xl font-bold text-xs md:text-sm text-slate-300 hover:bg-slate-800 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-gamepad"></i>
+                    <span>Local / Vs Cyber-AI</span>
+                </button>
+            </div>
+
+            <!-- TAB A: 1v1 LIVE WEBRTC MULTIPLAYER -->
+            <div id="view-webrtc" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div class="holo-card p-3.5 rounded-2xl">
+                        <label class="block text-[11px] font-cyber font-bold uppercase text-cyan-300 mb-1">
+                            🕹️ Commander Callsign
+                        </label>
+                        <input id="rtc-name" type="text" value="Neon_Valkyrie" maxlength="16"
+                            class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 focus:border-cyan-400 focus:outline-none font-bold text-white text-base">
+                    </div>
+
+                    <div class="holo-card p-3.5 rounded-2xl">
+                        <label class="block text-[11px] font-cyber font-bold uppercase text-amber-300 mb-1">
+                            ⚡ Tokens Per Squadron (Match Speed)
+                        </label>
+                        <select id="rtc-tokens-count" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-amber-500/40 focus:border-amber-400 focus:outline-none font-bold text-white text-sm">
+                            <option value="2">2 Tokens (Hyper Blitz ~4 min)</option>
+                            <option value="4" selected>4 Tokens (Classic Full Squadron)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- HOST ARENA -->
+                    <div class="bg-gradient-to-br from-rose-950/75 to-slate-900/90 p-4 md:p-5 rounded-2xl border border-rose-400/50 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="bg-rose-500/20 border border-rose-400 text-rose-300 text-[10px] font-cyber font-bold uppercase px-2.5 py-0.5 rounded-full">Crimson Squadron</span>
+                                <span class="text-lg">🔴🎲</span>
+                            </div>
+                            <h3 class="font-cyber font-bold text-lg text-white">Host 3D Arena</h3>
+                            <p class="text-xs text-slate-300 mt-0.5 mb-3">
+                                Generate a 6-character Room Code &amp; Invite Link for your opponent to join live on their screen.
+                            </p>
+                        </div>
+
+                        <div id="host-idle-box">
+                            <button id="btn-create-room" onclick="createWebRTCRoom()" class="btn-neon w-full py-3 bg-rose-500 hover:bg-rose-400 text-white font-cyber font-bold text-xs md:text-sm rounded-xl shadow-[0_4px_0_#881337] flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-satellite-dish"></i>
+                                <span>Create Room &amp; Invite Link</span>
+                            </button>
+                        </div>
+
+                        <div id="host-active-box" class="hidden space-y-2.5 bg-slate-950/90 p-3 rounded-xl border border-rose-400/40">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="text-[10px] font-cyber uppercase text-slate-400 block">Room Code</span>
+                                    <span id="display-room-code" class="font-cyber font-extrabold text-2xl tracking-widest text-rose-400">------</span>
+                                </div>
+                                <button onclick="copyRoomCode()" class="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/50 text-rose-200 font-bold text-xs rounded-lg">
+                                    <i class="fa-solid fa-copy mr-1"></i>Copy Code
+                                </button>
+                            </div>
+
+                            <div>
+                                <span class="text-[10px] font-cyber uppercase text-slate-400 block mb-1">Invite Link</span>
+                                <div class="flex gap-1.5">
+                                    <input id="display-invite-link" type="text" readonly class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[11px] font-mono text-cyan-200">
+                                    <button onclick="copyInviteLink()" class="px-3 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-extrabold text-xs rounded-lg flex-shrink-0">
+                                        Copy Link
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 text-xs font-bold text-amber-300 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-400/30">
+                                <i class="fa-solid fa-spinner fa-spin"></i>
+                                <span id="host-status-text">Awaiting challenger connection...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- JOIN ARENA -->
+                    <div class="bg-gradient-to-br from-amber-950/70 to-slate-900/90 p-4 md:p-5 rounded-2xl border border-amber-400/50 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="bg-amber-500/20 border border-amber-400 text-amber-300 text-[10px] font-cyber font-bold uppercase px-2.5 py-0.5 rounded-full">Solar Gold Squadron</span>
+                                <span class="text-lg">🟡⚡</span>
+                            </div>
+                            <h3 class="font-cyber font-bold text-lg text-white">Join 3D Arena</h3>
+                            <p class="text-xs text-slate-300 mt-0.5 mb-3">
+                                Enter the 6-character Room Code from your friend (auto-filled when opening an Invite Link).
+                            </p>
+                        </div>
+
+                        <div class="space-y-2.5">
+                            <input id="input-join-code" type="text" maxlength="6" placeholder="E.G. LUDO3D"
+                                class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border-2 border-amber-500/50 focus:border-amber-400 focus:outline-none font-cyber font-extrabold text-xl text-center uppercase tracking-widest text-amber-300">
+                            <button id="btn-join-room" onclick="joinWebRTCRoom()" class="btn-neon w-full py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-cyber font-extrabold text-xs md:text-sm rounded-xl shadow-[0_4px_0_#92400e] flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-bolt"></i>
+                                <span>Connect &amp; Enter Arena</span>
+                            </button>
+                            <p id="join-status-text" class="hidden text-xs font-bold text-center text-amber-300"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB B: LOCAL / VS CYBER-AI MODE -->
+            <div id="view-local" class="hidden space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="holo-card p-3.5 rounded-2xl">
+                        <label class="block text-[11px] font-cyber font-bold uppercase text-cyan-300 mb-1">Players / AI Setup</label>
+                        <select id="local-players-mode" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 font-bold text-white text-sm">
+                            <option value="2p_ai" selected>1 Human vs 1 Cyber-AI</option>
+                            <option value="4p_ai">1 Human vs 3 Cyber-AIs (4-Way)</option>
+                            <option value="2p_pass">2 Humans Pass &amp; Play</option>
+                            <option value="4p_pass">4 Humans Pass &amp; Play</option>
+                        </select>
+                    </div>
+                    <div class="holo-card p-3.5 rounded-2xl">
+                        <label class="block text-[11px] font-cyber font-bold uppercase text-emerald-300 mb-1">Tokens Per Player</label>
+                        <select id="local-tokens-count" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 font-bold text-white text-sm">
+                            <option value="2">2 Tokens (Quick Blitz)</option>
+                            <option value="4" selected>4 Tokens (Full Squadron)</option>
+                        </select>
+                    </div>
+                    <div class="holo-card p-3.5 rounded-2xl">
+                        <label class="block text-[11px] font-cyber font-bold uppercase text-rose-300 mb-1">Your Callsign</label>
+                        <input id="local-p1-name" type="text" value="Crimson_Ace" maxlength="14" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-rose-500/40 font-bold text-white text-sm">
+                    </div>
+                </div>
+
+                <div class="text-center pt-1">
+                    <button onclick="startLocalMatch()" class="btn-neon px-10 py-3.5 bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 text-slate-950 font-cyber font-black text-sm md:text-base rounded-2xl shadow-[0_5px_0_#0369a1]">
+                        🚀 LAUNCH 3D CYBERLUDO ARENA
+                    </button>
+                </div>
+            </div>
+
+            <p id="lobby-toast" class="hidden mt-3 text-center text-xs font-bold text-emerald-300 bg-emerald-950/90 border border-emerald-400/50 py-1.5 px-3 rounded-xl"></p>
+        </div>
+    </main>
+
+    <!-- =========================================================================
+         4. IN-GAME FUTURISTIC 3D HUD (SQUADRON CARDS, DICE LAUNCHER & FEED)
+         ========================================================================= -->
+    <section id="arena-hud" class="hidden fixed inset-0 z-20 pointer-events-none flex flex-col justify-between p-2.5 md:p-4 pt-14 md:pt-16">
+
+        <!-- TOP SQUADRON STATUS CARDS -->
+        <div id="squadron-cards-row" class="pointer-events-auto max-w-5xl w-full mx-auto grid grid-cols-2 md:grid-cols-4 gap-2">
+            <!-- Populated dynamically for active players -->
+        </div>
+
+        <!-- FLOATING TACTICAL EVENT BANNER -->
+        <div id="event-callout" class="hidden self-center pointer-events-none">
+            <div class="holo-panel px-6 py-2.5 rounded-full border-2 border-amber-300 text-center">
+                <span id="event-callout-text" class="font-cyber font-extrabold text-xs md:text-sm text-amber-300 tracking-wide">
+                    ⚡ PLASMA CAPTURE! OPPONENT SENT BACK TO BASE!
+                </span>
+            </div>
+        </div>
+
+        <!-- BOTTOM HOLOGRAPHIC DICE & TURN ACTION DECK -->
+        <div class="pointer-events-auto max-w-xl w-full mx-auto holo-panel rounded-3xl p-3.5 md:p-4 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <!-- 3D Dice Readout Badge -->
+                <div id="dice-readout-box" class="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-slate-950 border-2 border-cyan-400 flex flex-col items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.35)]">
+                    <span class="text-[9px] font-cyber uppercase text-cyan-400">DICE</span>
+                    <span id="dice-value-text" class="font-cyber font-black text-2xl md:text-3xl text-white">6</span>
+                </div>
+                <div>
+                    <div id="turn-player-label" class="font-cyber font-extrabold text-sm md:text-base text-cyan-300">
+                        Crimson_Ace's Turn
+                    </div>
+                    <p id="turn-instruction-text" class="text-xs md:text-sm text-slate-300 font-semibold">
+                        Roll the holographic cube (Spacebar or Button)!
+                    </p>
+                </div>
+            </div>
+
+            <button id="btn-roll-dice" onclick="handleRollDiceClick()" class="btn-neon px-6 md:px-8 py-3.5 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 disabled:opacity-40 text-slate-950 font-cyber font-black text-xs md:text-sm rounded-2xl shadow-[0_4px_0_#065f46] flex items-center gap-2 flex-shrink-0">
+                <i class="fa-solid fa-dice-d6 text-lg"></i>
+                <span>ROLL 3D DICE</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- =========================================================================
+         5. VICTORY PODIUM MODAL & EXIT CONFIRMATION
+         ========================================================================= -->
+    <div id="victory-modal" class="hidden fixed inset-0 z-50 bg-slate-950/88 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="holo-panel w-full max-w-lg rounded-3xl p-6 md:p-8 text-center border-2 border-amber-400">
+            <div class="text-6xl mb-2">👑🎲</div>
+            <span class="bg-amber-400/20 border border-amber-400 text-amber-300 font-cyber text-xs font-bold px-3.5 py-1 rounded-full uppercase">
+                Arena Core Ascended • Victory
+            </span>
+            <h2 id="victory-headline" class="font-cyber text-2xl md:text-4xl font-black text-white mt-2">
+                Crimson_Ace Wins!
+            </h2>
+            <p id="victory-subtext" class="text-slate-300 text-sm mt-1 mb-6">
+                All plasma tokens reached the central Quantum Core!
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <button onclick="requestRematch()" class="btn-neon px-7 py-3 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-cyber font-extrabold text-xs md:text-sm rounded-2xl shadow-[0_4px_0_#065f46]">
+                    🔄 Rematch Arena
+                </button>
+                <button onclick="exitToLobby()" class="btn-neon px-7 py-3 bg-slate-800 hover:bg-slate-700 text-white font-cyber font-extrabold text-xs md:text-sm rounded-2xl">
+                    🏠 Return to Lobby
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-exit-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 flex items-center justify-center p-4">
+        <div class="holo-panel w-full max-w-sm rounded-3xl p-6 text-center border border-rose-500/60">
+            <h3 class="font-cyber font-bold text-lg text-white mb-1">Abort 3D Match?</h3>
+            <p class="text-xs text-slate-300 mb-5">Your current board state and P2P session will close.</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeConfirmExit()" class="px-5 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold text-sm">Stay</button>
+                <button onclick="exitToLobby()" class="px-5 py-2 rounded-xl bg-rose-600 text-white font-bold text-sm">Abort</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         6. COMPLETE 3D THREE.JS, LUDO RULES ENGINE & WEBRTC MULTIPLAYER SCRIPT
+         ========================================================================= -->
+    <script>
+        /* ---------------------------------------------------------------------
+           A. FUTURISTIC WEB AUDIO SYNTHESIZER
+           --------------------------------------------------------------------- */
+        const NeonSFX = {
+            ctx: null,
+            muted: false,
+            init() {
+                if (!this.ctx) {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AC();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            tone(freq, type, dur, delay = 0, vol = 0.14) {
+                if (this.muted) return;
+                this.init();
+                const t = this.ctx.currentTime + delay;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, t);
+                gain.gain.setValueAtTime(vol, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(t);
+                osc.stop(t + dur);
+            },
+            click() { this.tone(720, 'sine', 0.08, 0, 0.1); },
+            diceRoll() {
+                for (let i = 0; i < 6; i++) {
+                    this.tone(300 + i * 95, 'triangle', 0.06, i * 0.055, 0.12);
+                }
+            },
+            tokenHop(stepIdx = 0) {
+                this.tone(480 + stepIdx * 45, 'sine', 0.09, 0, 0.14);
+            },
+            deploySix() {
+                [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 'triangle', 0.2, i * 0.06, 0.15));
+            },
+            captureBoom() {
+                this.tone(180, 'sawtooth', 0.25, 0, 0.22);
+                this.tone(95, 'square', 0.35, 0.05, 0.2);
+            },
+            goalAscend() {
+                [587.33, 739.99, 880, 1174.66].forEach((f, i) => this.tone(f, 'sine', 0.28, i * 0.07, 0.18));
+            }
+        };
+
+        function toggleSound() {
+            NeonSFX.muted = !NeonSFX.muted;
+            document.getElementById('sound-icon').className = NeonSFX.muted
+                ? 'fa-solid fa-volume-xmark text-rose-500'
+                : 'fa-solid fa-volume-high text-cyan-300';
+        }
+
+        /* ---------------------------------------------------------------------
+           B. CLASSIC 15x15 LUDO COORDINATE PATHS MAPPED TO 3D WORLD SPACE
+              Board indices (r, c) from 0..14 -> World X = (c - 7), Z = (r - 7)
+           --------------------------------------------------------------------- */
+        // 52-tile outer perimeter clockwise starting from Red's start tile (r=6, c=1)
+        const MAIN_TRACK = [
+            [6,1],[6,2],[6,3],[6,4],[6,5],             // 0..4   (Red arm right)
+            [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],       // 5..10  (Green arm up)
+            [0,7],                                     // 11     (Top center)
+            [0,8],[1,8],[2,8],[3,8],[4,8],[5,8],       // 12..17 (Green arm down - index 13 is Green start)
+            [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],  // 18..23 (Yellow arm right)
+            [7,14],                                    // 24     (Right center)
+            [8,14],[8,13],[8,12],[8,11],[8,10],[8,9],  // 25..30 (Yellow arm left - index 26 is Yellow start)
+            [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],  // 31..36 (Blue arm down)
+            [14,7],                                    // 37     (Bottom center)
+            [14,6],[13,6],[12,6],[11,6],[10,6],[9,6],  // 38..43 (Blue arm up - index 39 is Blue start)
+            [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],       // 44..49 (Red arm left)
+            [7,0],[6,0]                                // 50..51 (Left center -> wraps to 0)
+        ];
+
+        // Safe Star Squares (Start squares + 8-step star shields)
+        const SAFE_MAIN_INDICES = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+
+        // Player Configurations: 0 = Crimson (Bottom-Left), 1 = Emerald (Top-Left), 2 = Solar Gold (Top-Right), 3 = Cyber Blue (Bottom-Right)
+        const PLAYER_CONFIGS = [
+            {
+                id: 0,
+                defaultName: 'Crimson_Valkyrie',
+                hex: '#f43f5e',
+                threeColor: 0xf43f5e,
+                emissive: 0x9f1239,
+                startMainIdx: 0,
+                yardCoords: [[2.2, 2.2], [2.2, 3.8], [3.8, 2.2], [3.8, 3.8]], // Top-Left visual quadrant (r=1..4, c=1..4)
+                homeStretch: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]]
+            },
+            {
+                id: 1,
+                defaultName: 'Emerald_Spectre',
+                hex: '#10b981',
+                threeColor: 0x10b981,
+                emissive: 0x065f46,
+                startMainIdx: 13,
+                yardCoords: [[2.2, 10.2], [2.2, 11.8], [3.8, 10.2], [3.8, 11.8]], // Top-Right quadrant (r=1..4, c=10..13)
+                homeStretch: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]]
+            },
+            {
+                id: 2,
+                defaultName: 'Solar_Phalanx',
+                hex: '#fbbf24',
+                threeColor: 0xfbbf24,
+                emissive: 0xb45309,
+                startMainIdx: 26,
+                yardCoords: [[10.2, 10.2], [10.2, 11.8], [11.8, 10.2], [11.8, 11.8]], // Bottom-Right quadrant
+                homeStretch: [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]]
+            },
+            {
+                id: 3,
+                defaultName: 'Cobalt_Nexus',
+                hex: '#38bdf8',
+                threeColor: 0x38bdf8,
+                emissive: 0x0369a1,
+                startMainIdx: 39,
+                yardCoords: [[10.2, 2.2], [10.2, 3.8], [11.8, 2.2], [11.8, 3.8]], // Bottom-Left quadrant
+                homeStretch: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
+            }
+        ];
+
+        /* ---------------------------------------------------------------------
+           C. GAME & MULTIPLAYER STATE
+           --------------------------------------------------------------------- */
+        const game = {
+            mode: 'webrtc',     // 'webrtc' | 'local'
+            isHost: true,
+            peer: null,
+            conn: null,
+            roomCode: '',
+            pingTimer: null,
+
+            inMatch: false,
+            tokensPerPlayer: 4,
+            players: [],        // Array of { id, name, hex, threeColor, isAI, isRemote, tokens: [{ id, progress, mesh, ringMesh }] }
+            turnIdx: 0,         // Index into game.players
+            phase: 'WAIT_ROLL', // 'WAIT_ROLL' | 'ROLLING' | 'SELECT_TOKEN' | 'MOVING' | 'GAME_OVER'
+            diceVal: 6,
+            movableTokenIds: []
+        };
+
+        /* ---------------------------------------------------------------------
+           D. LOBBY UI & SCENIC BOARD VIEW
+           --------------------------------------------------------------------- */
+        function setLobbyMode(mode) {
+            NeonSFX.click();
+            stateModeSwitch(mode);
+        }
+
+        function stateModeSwitch(mode) {
+            game.mode = mode;
+            const isRtc = mode === 'webrtc';
+            document.getElementById('tab-webrtc').className = isRtc
+                ? "py-2 px-3 rounded-xl font-bold text-xs md:text-sm bg-cyan-400 text-slate-950 shadow transition flex items-center justify-center gap-2"
+                : "py-2 px-3 rounded-xl font-bold text-xs md:text-sm text-slate-300 hover:bg-slate-800 transition flex items-center justify-center gap-2";
+            document.getElementById('tab-local').className = !isRtc
+                ? "py-2 px-3 rounded-xl font-bold text-xs md:text-sm bg-cyan-400 text-slate-950 shadow transition flex items-center justify-center gap-2"
+                : "py-2 px-3 rounded-xl font-bold text-xs md:text-sm text-slate-300 hover:bg-slate-800 transition flex items-center justify-center gap-2";
+
+            document.getElementById('view-webrtc').classList.toggle('hidden', !isRtc);
+            document.getElementById('view-local').classList.toggle('hidden', isRtc);
+        }
+
+        function toggleScenicView() {
+            NeonSFX.click();
+            const lobby = document.getElementById('lobby-overlay');
+            const pill = document.getElementById('scenic-return-pill');
+            const hiding = !lobby.classList.contains('hidden');
+            lobby.classList.toggle('hidden', hiding);
+            pill.classList.toggle('hidden', !hiding);
+            document.getElementById('scenic-text').textContent = hiding ? 'Open Lobby' : '3D Board View';
+        }
+
+        function showLobbyToast(msg, isErr = false) {
+            const el = document.getElementById('lobby-toast');
+            el.textContent = msg;
+            el.className = isErr
+                ? "mt-3 text-center text-xs font-bold text-rose-300 bg-rose-950/90 border border-rose-500/50 py-1.5 px-3 rounded-xl block"
+                : "mt-3 text-center text-xs font-bold text-emerald-300 bg-emerald-950/90 border border-emerald-400/50 py-1.5 px-3 rounded-xl block";
+            setTimeout(() => el.classList.add('hidden'), 3200);
+        }
+
+        /* ---------------------------------------------------------------------
+           E. WEBRTC (PEERJS + SANDBOX BROADCASTCHANNEL FALLBACK) MULTIPLAYER
+           --------------------------------------------------------------------- */
+        let fallbackBC = null;
+
+        function genRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let out = '';
+            for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+            return out;
+        }
+
+        function attachFallbackBC(code, isHost) {
+            if (fallbackBC) fallbackBC.close();
+            if (typeof BroadcastChannel === 'undefined') return null;
+
+            const bc = new BroadcastChannel(`CYBERLUDO_3D_${code}`);
+            const wrap = {
+                open: true,
+                isFallback: true,
+                send(data) { bc.postMessage(data); },
+                close() { this.open = false; bc.close(); }
+            };
+            bc.onmessage = (e) => { if (wrap.open) handleNetPacket(e.data); };
+
+            if (!isHost) {
+                setTimeout(() => {
+                    if (wrap.open) {
+                        const name = document.getElementById('rtc-name').value.trim() || 'Solar_Guest';
+                        wrap.send({ type: 'PEER_JOINED', name });
+                    }
+                }, 160);
+            }
+            return wrap;
+        }
+
+        function revealHostUI(isSandbox) {
+            document.getElementById('host-idle-box').classList.add('hidden');
+            document.getElementById('host-active-box').classList.remove('hidden');
+            document.getElementById('display-room-code').textContent = game.roomCode;
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('room', game.roomCode);
+            document.getElementById('display-invite-link').value = url.toString();
+
+            document.getElementById('host-status-text').textContent = isSandbox
+                ? 'Tab-P2P Ready: Open a 2nd browser tab & enter this Room Code!'
+                : 'Awaiting challenger connection...';
+        }
+
+        function createWebRTCRoom() {
+            NeonSFX.init();
+            NeonSFX.click();
+            game.isHost = true;
+            game.mode = 'webrtc';
+            game.roomCode = genRoomCode();
+            game.tokensPerPlayer = parseInt(document.getElementById('rtc-tokens-count').value, 10);
+
+            fallbackBC = attachFallbackBC(game.roomCode, true);
+
+            const btn = document.getElementById('btn-create-room');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Opening Node...`;
+
+            if (game.peer) { try { game.peer.destroy(); } catch (e) {} game.peer = null; }
+
+            try {
+                if (typeof Peer === 'undefined') throw new Error('No PeerJS');
+                game.peer = new Peer(`CLUDO-${game.roomCode}`, {
+                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+                });
+                game.peer.on('open', () => revealHostUI(false));
+                game.peer.on('connection', (conn) => {
+                    if (fallbackBC) { fallbackBC.close(); fallbackBC = null; }
+                    game.conn = conn;
+                    bindConnHandlers();
+                });
+                game.peer.on('error', () => {
+                    game.conn = fallbackBC;
+                    revealHostUI(true);
+                });
+            } catch (e) {
+                game.conn = fallbackBC;
+                revealHostUI(true);
+            }
+        }
+
+        function joinWebRTCRoom() {
+            NeonSFX.init();
+            NeonSFX.click();
+            const code = document.getElementById('input-join-code').value.trim().toUpperCase();
+            if (code.length < 4) {
+                showLobbyToast("Enter a valid 6-character Room Code!", true);
+                return;
+            }
+            game.isHost = false;
+            game.mode = 'webrtc';
+            game.roomCode = code;
+
+            const btn = document.getElementById('btn-join-room');
+            const lbl = document.getElementById('join-status-text');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Linking...`;
+            lbl.textContent = `Dialing CyberLudo Arena ${code}...`;
+            lbl.classList.remove('hidden');
+
+            fallbackBC = attachFallbackBC(code, false);
+
+            if (game.peer) { try { game.peer.destroy(); } catch (e) {} game.peer = null; }
+
+            try {
+                if (typeof Peer === 'undefined') throw new Error('No PeerJS');
+                game.peer = new Peer({
+                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+                });
+                game.peer.on('open', () => {
+                    const conn = game.peer.connect(`CLUDO-${code}`, { reliable: true });
+                    game.conn = conn;
+                    bindConnHandlers();
+                });
+                game.peer.on('error', () => {
+                    game.conn = fallbackBC;
+                    lbl.textContent = "Tab-P2P Link Active! Waiting for Host tab...";
+                });
+            } catch (e) {
+                game.conn = fallbackBC;
+                lbl.textContent = "Tab-P2P Link Active! Connecting to Host tab...";
+            }
+        }
+
+        function bindConnHandlers() {
+            const conn = game.conn;
+            conn.on('open', () => {
+                startPingLoop();
+                if (!game.isHost) {
+                    const name = document.getElementById('rtc-name').value.trim() || 'Solar_Guest';
+                    conn.send({ type: 'PEER_JOINED', name });
+                }
+            });
+            conn.on('data', (pkt) => handleNetPacket(pkt));
+        }
+
+        function startPingLoop() {
+            const badge = document.getElementById('ping-badge');
+            badge.classList.remove('hidden');
+            badge.classList.add('flex');
+            if (game.pingTimer) clearInterval(game.pingTimer);
+            game.pingTimer = setInterval(() => {
+                if (game.conn && game.conn.open) game.conn.send({ type: 'PING', ts: Date.now() });
+            }, 2500);
+        }
+
+        function handleNetPacket(pkt) {
+            if (!pkt || !pkt.type) return;
+            switch (pkt.type) {
+                case 'PING':
+                    if (game.conn && game.conn.open) game.conn.send({ type: 'PONG', ts: pkt.ts });
+                    break;
+                case 'PONG':
+                    document.getElementById('ping-text').textContent = game.conn && game.conn.isFallback
+                        ? `Tab-P2P ${Math.max(1, Date.now() - pkt.ts)}ms`
+                        : `P2P ${Math.max(8, Date.now() - pkt.ts)}ms`;
+                    break;
+                case 'PEER_JOINED':
+                    if (!game.isHost) return;
+                    if (!game.conn && fallbackBC) game.conn = fallbackBC;
+                    startPingLoop();
+                    const hostName = document.getElementById('rtc-name').value.trim() || 'Crimson_Host';
+                    const guestName = pkt.name;
+                    game.conn.send({
+                        type: 'START_MATCH',
+                        hostName,
+                        guestName,
+                        tokensPerPlayer: game.tokensPerPlayer
+                    });
+                    setupWebRTCMatch(hostName, guestName, game.tokensPerPlayer);
+                    break;
+                case 'START_MATCH':
+                    if (!game.conn && fallbackBC) game.conn = fallbackBC;
+                    startPingLoop();
+                    setupWebRTCMatch(pkt.hostName, pkt.guestName, pkt.tokensPerPlayer);
+                    break;
+                case 'DICE_ROLLED':
+                    executeAnimatedDiceRoll(pkt.val, true);
+                    break;
+                case 'TOKEN_MOVED':
+                    executeTokenMove(pkt.playerIdx, pkt.tokenId, true);
+                    break;
+                case 'REMATCH':
+                    if (game.isHost) {
+                        const hName = game.players[0].name;
+                        const gName = game.players[1].name;
+                        setupWebRTCMatch(hName, gName, game.tokensPerPlayer);
+                    } else {
+                        setupWebRTCMatch(game.players[0].name, game.players[1].name, game.tokensPerPlayer);
+                    }
+                    break;
+            }
+        }
+
+        function copyRoomCode() {
+            copyStr(game.roomCode);
+            showLobbyToast(`Copied Room Code: ${game.roomCode}`);
+        }
+        function copyInviteLink() {
+            copyStr(document.getElementById('display-invite-link').value);
+            showLobbyToast("Invite Link copied! Share it with your rival.");
+        }
+        function copyStr(s) {
+            const ta = document.createElement('textarea');
+            ta.value = s;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+
+        /* ---------------------------------------------------------------------
+           F. MATCH INITIALIZATION (WEBRTC 2-PLAYER OR LOCAL 2/4-PLAYER)
+           --------------------------------------------------------------------- */
+        function setupWebRTCMatch(hostName, guestName, tokensCount) {
+            game.tokensPerPlayer = tokensCount;
+            // Opposite corners: Player 0 (Crimson) vs Player 2 (Solar Gold)
+            game.players = [
+                buildPlayerObj(PLAYER_CONFIGS[0], hostName, false, !game.isHost),
+                buildPlayerObj(PLAYER_CONFIGS[2], guestName, false, game.isHost)
+            ];
+            enterMatchArena();
+        }
+
+        function startLocalMatch() {
+            NeonSFX.init();
+            NeonSFX.click();
+            game.mode = 'local';
+            game.isHost = true;
+
+            const modeVal = document.getElementById('local-players-mode').value;
+            game.tokensPerPlayer = parseInt(document.getElementById('local-tokens-count').value, 10);
+            const p1Name = document.getElementById('local-p1-name').value.trim() || 'Crimson_Ace';
+
+            if (modeVal === '2p_ai') {
+                game.players = [
+                    buildPlayerObj(PLAYER_CONFIGS[0], p1Name, false, false),
+                    buildPlayerObj(PLAYER_CONFIGS[2], 'Cyber_AI_v9', true, false)
+                ];
+            } else if (modeVal === '4p_ai') {
+                game.players = [
+                    buildPlayerObj(PLAYER_CONFIGS[0], p1Name, false, false),
+                    buildPlayerObj(PLAYER_CONFIGS[1], 'Spectre_Bot', true, false),
+                    buildPlayerObj(PLAYER_CONFIGS[2], 'Solar_Bot', true, false),
+                    buildPlayerObj(PLAYER_CONFIGS[3], 'Nexus_Bot', true, false)
+                ];
+            } else if (modeVal === '2p_pass') {
+                game.players = [
+                    buildPlayerObj(PLAYER_CONFIGS[0], p1Name, false, false),
+                    buildPlayerObj(PLAYER_CONFIGS[2], 'Player_2_Gold', false, false)
+                ];
+            } else {
+                game.players = [
+                    buildPlayerObj(PLAYER_CONFIGS[0], p1Name, false, false),
+                    buildPlayerObj(PLAYER_CONFIGS[1], 'Player_2_Emerald', false, false),
+                    buildPlayerObj(PLAYER_CONFIGS[2], 'Player_3_Gold', false, false),
+                    buildPlayerObj(PLAYER_CONFIGS[3], 'Player_4_Cobalt', false, false)
+                ];
+            }
+
+            enterMatchArena();
+        }
+
+        function buildPlayerObj(cfg, name, isAI, isRemote) {
+            const tokens = [];
+            for (let i = 0; i < game.tokensPerPlayer; i++) {
+                tokens.push({
+                    id: i,
+                    progress: -1, // -1 = In Base Yard, 0..50 = Main Track, 51..55 = Home Stretch, 56 = Ascended Goal!
+                    mesh: null,
+                    ringMesh: null
+                });
+            }
+            return {
+                id: cfg.id,
+                name,
+                hex: cfg.hex,
+                threeColor: cfg.threeColor,
+                emissive: cfg.emissive,
+                startMainIdx: cfg.startMainIdx,
+                yardCoords: cfg.yardCoords,
+                homeStretch: cfg.homeStretch,
+                isAI,
+                isRemote,
+                tokens
+            };
+        }
+
+        function enterMatchArena() {
+            game.inMatch = true;
+            game.turnIdx = 0;
+            game.phase = 'WAIT_ROLL';
+            game.movableTokenIds = [];
+
+            document.getElementById('lobby-overlay').classList.add('hidden');
+            document.getElementById('scenic-return-pill').classList.add('hidden');
+            document.getElementById('btn-scenic').classList.add('hidden');
+            document.getElementById('victory-modal').classList.add('hidden');
+            document.getElementById('arena-hud').classList.remove('hidden');
+            document.getElementById('btn-exit-match').classList.remove('hidden');
+            document.getElementById('btn-exit-match').classList.add('flex');
+
+            spawnAll3DPlayerTokens();
+            beginTurn();
+        }
+
+        /* ---------------------------------------------------------------------
+           G. FULL LUDO RULES ENGINE (ROLL 6, DEPLOY, CAPTURE, SAFE ZONES & HOME)
+           --------------------------------------------------------------------- */
+        function getActivePlayer() {
+            return game.players[game.turnIdx];
+        }
+
+        function beginTurn() {
+            if (!game.inMatch) return;
+            game.phase = 'WAIT_ROLL';
+            game.movableTokenIds = [];
+            clearTokenHighlights();
+            updateArenaHUD();
+
+            const p = getActivePlayer();
+            if (p.isAI) {
+                setTimeout(() => {
+                    if (game.inMatch && game.phase === 'WAIT_ROLL' && getActivePlayer() === p) {
+                        const roll = Math.floor(Math.random() * 6) + 1;
+                        executeAnimatedDiceRoll(roll, false);
+                    }
+                }, 850);
+            }
+        }
+
+        function handleRollDiceClick() {
+            if (!game.inMatch || game.phase !== 'WAIT_ROLL') return;
+            const p = getActivePlayer();
+            if (p.isAI || p.isRemote) return;
+
+            const roll = Math.floor(Math.random() * 6) + 1;
+            if (game.mode === 'webrtc' && game.conn && game.conn.open) {
+                game.conn.send({ type: 'DICE_ROLLED', val: roll });
+            }
+            executeAnimatedDiceRoll(roll, false);
+        }
+
+        function executeAnimatedDiceRoll(val, fromRemote) {
+            game.phase = 'ROLLING';
+            game.diceVal = val;
+            NeonSFX.diceRoll();
+            updateArenaHUD();
+
+            // Spin 3D Holographic Dice Cube & land on target face
+            arena3D.diceSpinTimer = 28;
+            arena3D.diceTargetVal = val;
+
+            setTimeout(() => {
+                document.getElementById('dice-value-text').textContent = val;
+                evaluateMovableTokensAfterRoll();
+            }, 520);
+        }
+
+        function evaluateMovableTokensAfterRoll() {
+            const p = getActivePlayer();
+            const d = game.diceVal;
+            const validIds = [];
+
+            p.tokens.forEach(tok => {
+                if (tok.progress === -1) {
+                    // Must roll a 6 to deploy from Base Yard
+                    if (d === 6) validIds.push(tok.id);
+                } else if (tok.progress >= 0 && tok.progress + d <= 56) {
+                    validIds.push(tok.id);
+                }
+            });
+
+            game.movableTokenIds = validIds;
+
+            if (validIds.length === 0) {
+                // No valid moves -> pass turn after brief notice
+                game.phase = 'MOVING';
+                updateArenaHUD(`No valid moves for ${p.name} (Rolled ${d})`);
+                setTimeout(() => advanceToNextPlayer(false), 1100);
+                return;
+            }
+
+            // Auto-move if AI, or if human has only 1 valid token (or all valid tokens are still in yard)
+            const allInYard = validIds.every(id => p.tokens[id].progress === -1);
+            if (p.isAI) {
+                const chosenId = chooseBestAIToken(p, validIds, d);
+                setTimeout(() => executeTokenMove(game.turnIdx, chosenId, false), 650);
+                return;
+            }
+
+            if (!p.isRemote && (validIds.length === 1 || allInYard)) {
+                const chosenId = validIds[0];
+                setTimeout(() => {
+                    if (game.mode === 'webrtc' && game.conn && game.conn.open) {
+                        game.conn.send({ type: 'TOKEN_MOVED', playerIdx: game.turnIdx, tokenId: chosenId });
+                    }
+                    executeTokenMove(game.turnIdx, chosenId, false);
+                }, 420);
+                return;
+            }
+
+            // Highlight selectable 3D tokens for local player
+            game.phase = 'SELECT_TOKEN';
+            if (!p.isRemote) {
+                highlightSelectableTokens(p, validIds);
+            }
+            updateArenaHUD();
+        }
+
+        function chooseBestAIToken(player, validIds, dice) {
+            // Prioritize: 1) Reaching Core (56), 2) Capturing opponent, 3) Deploying on 6, 4) Furthest token
+            for (const id of validIds) {
+                const prog = player.tokens[id].progress;
+                if (prog + dice === 56) return id;
+            }
+            for (const id of validIds) {
+                if (player.tokens[id].progress === -1 && dice === 6) return id;
+            }
+            validIds.sort((a, b) => player.tokens[b].progress - player.tokens[a].progress);
+            return validIds[0];
+        }
+
+        function on3DTokenClicked(playerIdx, tokenId) {
+            if (!game.inMatch || game.phase !== 'SELECT_TOKEN') return;
+            if (playerIdx !== game.turnIdx) return;
+            const p = getActivePlayer();
+            if (p.isAI || p.isRemote) return;
+            if (!game.movableTokenIds.includes(tokenId)) return;
+
+            if (game.mode === 'webrtc' && game.conn && game.conn.open) {
+                game.conn.send({ type: 'TOKEN_MOVED', playerIdx, tokenId });
+            }
+            executeTokenMove(playerIdx, tokenId, false);
+        }
+
+        function executeTokenMove(playerIdx, tokenId, fromRemote) {
+            game.phase = 'MOVING';
+            clearTokenHighlights();
+
+            const p = game.players[playerIdx];
+            const tok = p.tokens[tokenId];
+            const d = game.diceVal;
+
+            if (tok.progress === -1) {
+                // Deploy from Base Yard onto Start Tile
+                tok.progress = 0;
+                NeonSFX.deploySix();
+                animateTokenToBoardCoord(p, tok, () => {
+                    finishMoveResolution(p, tok, true);
+                });
+                return;
+            }
+
+            // Step-by-step hopping animation along the 3D tiles
+            let stepsRemaining = d;
+            function stepHop() {
+                if (stepsRemaining <= 0) {
+                    finishMoveResolution(p, tok, d === 6);
+                    return;
+                }
+                tok.progress++;
+                stepsRemaining--;
+                NeonSFX.tokenHop(d - stepsRemaining);
+                animateTokenToBoardCoord(p, tok, () => {
+                    setTimeout(stepHop, 95);
+                });
+            }
+            stepHop();
+        }
+
+        function finishMoveResolution(player, movedToken, rolledSix) {
+            let earnedBonusRoll = rolledSix;
+
+            // 1. Check if token ascended into the Central Quantum Core (progress === 56)
+            if (movedToken.progress === 56) {
+                NeonSFX.goalAscend();
+                spawn3DBurst(0, 0.8, 0, player.threeColor, 26);
+                showEventBanner(`⚡ ${player.name} ASCENDED A TOKEN TO THE CORE! (+1 BONUS ROLL)`);
+                earnedBonusRoll = true;
+
+                // Check Victory Condition
+                if (player.tokens.every(t => t.progress === 56)) {
+                    game.phase = 'GAME_OVER';
+                    updateArenaHUD();
+                    showVictoryScreen(player);
+                    return;
+                }
+            }
+
+            // 2. Check Capture on Main Outer Track (progress 0..50)
+            if (movedToken.progress >= 0 && movedToken.progress <= 50) {
+                const mainIdx = (player.startMainIdx + movedToken.progress) % 52;
+                if (!SAFE_MAIN_INDICES.has(mainIdx)) {
+                    game.players.forEach(otherP => {
+                        if (otherP.id === player.id) return;
+                        otherP.tokens.forEach(otherTok => {
+                            if (otherTok.progress >= 0 && otherTok.progress <= 50) {
+                                const otherMain = (otherP.startMainIdx + otherTok.progress) % 52;
+                                if (otherMain === mainIdx) {
+                                    // CAPTURE! Send opponent token back to Base Yard!
+                                    otherTok.progress = -1;
+                                    NeonSFX.captureBoom();
+                                    const [r, c] = MAIN_TRACK[mainIdx];
+                                    spawn3DBurst(c - 7, 0.5, r - 7, otherP.threeColor, 30);
+                                    animateTokenToBoardCoord(otherP, otherTok);
+                                    showEventBanner(`💥 PLASMA CAPTURE! ${player.name} VAPORIZED ${otherP.name}! (+1 BONUS ROLL)`);
+                                    earnedBonusRoll = true;
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+
+            updateArenaHUD();
+            setTimeout(() => {
+                advanceToNextPlayer(earnedBonusRoll);
+            }, 450);
+        }
+
+        function advanceToNextPlayer(bonusRoll) {
+            if (!game.inMatch || game.phase === 'GAME_OVER') return;
+            if (!bonusRoll) {
+                game.turnIdx = (game.turnIdx + 1) % game.players.length;
+            }
+            beginTurn();
+        }
+
+        function showEventBanner(msg) {
+            const box = document.getElementById('event-callout');
+            document.getElementById('event-callout-text').textContent = msg;
+            box.classList.remove('hidden');
+            setTimeout(() => box.classList.add('hidden'), 2600);
+        }
+
+        function updateArenaHUD(customInstruction = null) {
+            const p = getActivePlayer();
+            const cardsRow = document.getElementById('squadron-cards-row');
+
+            cardsRow.innerHTML = game.players.map((pl, idx) => {
+                const isTurn = (idx === game.turnIdx);
+                const homeCount = pl.tokens.filter(t => t.progress === 56).length;
+                return `
+                    <div class="holo-panel rounded-2xl px-3 py-2 flex items-center justify-between ${isTurn ? 'active-turn-ring' : 'opacity-75'}"
+                         style="border-color: ${pl.hex}">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <span class="w-3.5 h-3.5 rounded-full flex-shrink-0" style="background:${pl.hex}; box-shadow:0 0 10px ${pl.hex}"></span>
+                            <span class="font-bold text-xs md:text-sm text-white truncate">${pl.name}</span>
+                        </div>
+                        <span class="font-cyber font-extrabold text-xs text-amber-300 flex-shrink-0">
+                            ${homeCount}/${game.tokensPerPlayer} 👑
+                        </span>
+                    </div>
+                `;
+            }).join('');
+
+            const turnLbl = document.getElementById('turn-player-label');
+            const instLbl = document.getElementById('turn-instruction-text');
+            const rollBtn = document.getElementById('btn-roll-dice');
+
+            turnLbl.textContent = `${p.name}'s Turn`;
+            turnLbl.style.color = p.hex;
+
+            if (customInstruction) {
+                instLbl.textContent = customInstruction;
+                rollBtn.disabled = true;
+                return;
+            }
+
+            if (p.isRemote) {
+                instLbl.textContent = `Waiting for ${p.name} on remote terminal...`;
+                rollBtn.disabled = true;
+            } else if (p.isAI) {
+                instLbl.textContent = `Cyber-AI calculating quantum trajectory...`;
+                rollBtn.disabled = true;
+            } else if (game.phase === 'WAIT_ROLL') {
+                instLbl.textContent = `Press ROLL 3D DICE or SPACEBAR! (6 deploys a token)`;
+                rollBtn.disabled = false;
+            } else if (game.phase === 'SELECT_TOKEN') {
+                instLbl.textContent = `Rolled ${game.diceVal}! Click a glowing 3D token on the board!`;
+                rollBtn.disabled = true;
+            } else {
+                instLbl.textContent = `Executing plasma movement...`;
+                rollBtn.disabled = true;
+            }
+        }
+
+        function showVictoryScreen(winner) {
+            NeonSFX.goalAscend();
+            document.getElementById('victory-headline').textContent = `🏆 ${winner.name} Wins!`;
+            document.getElementById('victory-headline').style.color = winner.hex;
+            document.getElementById('victory-subtext').textContent = `All ${game.tokensPerPlayer} plasma tokens ascended to the Quantum Core!`;
+            document.getElementById('victory-modal').classList.remove('hidden');
+        }
+
+        function requestRematch() {
+            if (game.mode === 'webrtc' && game.conn && game.conn.open) {
+                game.conn.send({ type: 'REMATCH' });
+            }
+            if (game.mode === 'webrtc') {
+                setupWebRTCMatch(game.players[0].name, game.players[1].name, game.tokensPerPlayer);
+            } else {
+                startLocalMatch();
+            }
+        }
+
+        function openConfirmExit() { document.getElementById('confirm-exit-modal').classList.remove('hidden'); }
+        function closeConfirmExit() { document.getElementById('confirm-exit-modal').classList.add('hidden'); }
+
+        function exitToLobby() {
+            closeConfirmExit();
+            game.inMatch = false;
+            if (game.pingTimer) clearInterval(game.pingTimer);
+            if (fallbackBC) { fallbackBC.close(); fallbackBC = null; }
+            if (game.conn) { try { game.conn.close(); } catch (e) {} game.conn = null; }
+            if (game.peer) { try { game.peer.destroy(); } catch (e) {} game.peer = null; }
+
+            clearAll3DTokens();
+            spawnDemoShowcaseTokens();
+
+            ['arena-hud', 'victory-modal', 'btn-exit-match', 'ping-badge'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+
+            document.getElementById('host-idle-box').classList.remove('hidden');
+            document.getElementById('host-active-box').classList.add('hidden');
+            document.getElementById('btn-create-room').disabled = false;
+            document.getElementById('btn-create-room').innerHTML = `<i class="fa-solid fa-satellite-dish"></i> Create Room & Invite Link`;
+            document.getElementById('btn-join-room').disabled = false;
+            document.getElementById('btn-join-room').innerHTML = `<i class="fa-solid fa-bolt"></i> Connect & Enter Arena`;
+
+            document.getElementById('btn-scenic').classList.remove('hidden');
+            document.getElementById('lobby-overlay').classList.remove('hidden');
+        }
+
+        /* ---------------------------------------------------------------------
+           H. THREE.JS HIGH-END 3D FUTURISTIC LUDO ARENA, TOKENS & HOLO-DICE
+           --------------------------------------------------------------------- */
+        const arena3D = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            boardGroup: null,
+            diceMesh: null,
+            coreCrystal: null,
+            tokenMeshes: [],
+            bursts: [],
+            raycaster: new THREE.Raycaster(),
+            mouse: new THREE.Vector2(),
+
+            camPreset: 0, // 0 = 3D Isometric, 1 = High Tactical Top-Down
+            camAngle: 0.78,
+            camHeight: 15.5,
+            camRadius: 14.5,
+            isDragging: false,
+            dragMoved: false,
+            prevMouse: { x: 0, y: 0 },
+
+            diceSpinTimer: 0,
+            diceTargetVal: 6
+        };
+
+        function initThreeArena() {
+            const canvas = document.getElementById('ludo-3d-canvas');
+            const w = window.innerWidth || 800;
+            const h = window.innerHeight || 600;
+
+            arena3D.scene = new THREE.Scene();
+            arena3D.scene.fog = new THREE.FogExp2(0x020617, 0.024);
+
+            arena3D.camera = new THREE.PerspectiveCamera(46, w / h, 0.1, 200);
+            arena3D.camera.position.set(11, 15.5, 11);
+
+            arena3D.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            arena3D.renderer.setSize(w, h);
+            arena3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            arena3D.renderer.shadowMap.enabled = true;
+
+            // Futuristic Three-Point Lighting
+            const ambient = new THREE.AmbientLight(0x93c5fd, 0.72);
+            arena3D.scene.add(ambient);
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
+            keyLight.position.set(12, 24, 10);
+            keyLight.castShadow = true;
+            arena3D.scene.add(keyLight);
+
+            const rimCyan = new THREE.PointLight(0x22d3ee, 1.8, 35);
+            rimCyan.position.set(-10, 6, -10);
+            arena3D.scene.add(rimCyan);
+
+            const rimMagenta = new THREE.PointLight(0xf43f5e, 1.5, 35);
+            rimMagenta.position.set(10, 6, 10);
+            arena3D.scene.add(rimMagenta);
+
+            // Outer Cyber Space Grid
+            const outerGrid = new THREE.GridHelper(60, 40, 0x0284c7, 0x0f172a);
+            outerGrid.position.y = -0.6;
+            arena3D.scene.add(outerGrid);
+
+            build3DLudoBoard();
+            build3DHoloDice();
+            spawnDemoShowcaseTokens();
+
+            // Orbit & Click Interaction Listeners
+            canvas.addEventListener('pointerdown', (e) => {
+                arena3D.isDragging = true;
+                arena3D.dragMoved = false;
+                arena3D.prevMouse = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('pointermove', (e) => {
+                if (!arena3D.isDragging) return;
+                const dx = e.clientX - arena3D.prevMouse.x;
+                const dy = e.clientY - arena3D.prevMouse.y;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) arena3D.dragMoved = true;
+
+                arena3D.camAngle -= dx * 0.007;
+                arena3D.camHeight = Math.max(8, Math.min(23, arena3D.camHeight + dy * 0.06));
+                arena3D.prevMouse = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('pointerup', (e) => {
+                if (arena3D.isDragging && !arena3D.dragMoved) {
+                    handleCanvasTapRayCast(e.clientX, e.clientY);
+                }
+                arena3D.isDragging = false;
+            });
+        }
+
+        function build3DLudoBoard() {
+            arena3D.boardGroup = new THREE.Group();
+            arena3D.scene.add(arena3D.boardGroup);
+
+            // Sleek Obsidian Hover-Chassis Base
+            const baseGeo = new THREE.BoxGeometry(16.2, 0.7, 16.2);
+            const baseMat = new THREE.MeshStandardMaterial({
+                color: 0x090d16,
+                metalness: 0.85,
+                roughness: 0.2
+            });
+            const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+            baseMesh.position.y = -0.35;
+            baseMesh.receiveShadow = true;
+            arena3D.boardGroup.add(baseMesh);
+
+            // Neon Perimeter Frame
+            const frameGeo = new THREE.BoxGeometry(16.5, 0.22, 16.5);
+            const frameMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
+            const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+            frameMesh.position.y = -0.1;
+            arena3D.boardGroup.add(frameMesh);
+
+            // Build 15x15 Tiles
+            const tileGeo = new THREE.BoxGeometry(0.92, 0.16, 0.92);
+            for (let r = 0; r < 15; r++) {
+                for (let c = 0; c < 15; c++) {
+                    // Skip center 3x3 Quantum Core & 6x6 Base Yards
+                    if (r >= 6 && r <= 8 && c >= 6 && c <= 8) continue;
+                    if ((r < 6 && c < 6) || (r < 6 && c > 8) || (r > 8 && c > 8) || (r > 8 && c < 6)) continue;
+
+                    let tileColor = 0x1e293b;
+                    let emissiveCol = 0x000000;
+
+                    // Color home stretches & start tiles
+                    if ((r === 7 && c >= 1 && c <= 5) || (r === 6 && c === 1)) {
+                        tileColor = 0xf43f5e; emissiveCol = 0x881337; // Crimson
+                    } else if ((c === 7 && r >= 1 && r <= 5) || (r === 1 && c === 8)) {
+                        tileColor = 0x10b981; emissiveCol = 0x064e3b; // Emerald
+                    } else if ((r === 7 && c >= 9 && c <= 13) || (r === 8 && c === 13)) {
+                        tileColor = 0xfbbf24; emissiveCol = 0x78350f; // Gold
+                    } else if ((c === 7 && r >= 9 && r <= 13) || (r === 13 && c === 6)) {
+                        tileColor = 0x38bdf8; emissiveCol = 0x0c4a6e; // Cobalt
+                    }
+
+                    // Check if Star Safe Square
+                    const mainIdx = MAIN_TRACK.findIndex(([mr, mc]) => mr === r && mc === c);
+                    const isSafe = mainIdx !== -1 && SAFE_MAIN_INDICES.has(mainIdx);
+
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: tileColor,
+                        emissive: emissiveCol,
+                        emissiveIntensity: 0.45,
+                        metalness: 0.5,
+                        roughness: 0.35
+                    });
+
+                    const tile = new THREE.Mesh(tileGeo, mat);
+                    tile.position.set(c - 7, 0.08, r - 7);
+                    tile.receiveShadow = true;
+                    arena3D.boardGroup.add(tile);
+
+                    if (isSafe) {
+                        const ring = new THREE.Mesh(
+                            new THREE.RingGeometry(0.24, 0.36, 6),
+                            new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+                        );
+                        ring.rotation.x = -Math.PI / 2;
+                        ring.position.set(c - 7, 0.17, r - 7);
+                        arena3D.boardGroup.add(ring);
+                    }
+                }
+            }
+
+            // 4 Glowing Quadrant Base Yards
+            const yardCenters = [
+                { x: -4.5, z: -4.5, col: 0xf43f5e }, // Top-Left Crimson
+                { x:  4.5, z: -4.5, col: 0x10b981 }, // Top-Right Emerald
+                { x:  4.5, z:  4.5, col: 0xfbbf24 }, // Bottom-Right Gold
+                { x: -4.5, z:  4.5, col: 0x38bdf8 }  // Bottom-Left Cobalt
+            ];
+
+            yardCenters.forEach(yc => {
+                const pad = new THREE.Mesh(
+                    new THREE.BoxGeometry(5.6, 0.2, 5.6),
+                    new THREE.MeshStandardMaterial({ color: yc.col, metalness: 0.65, roughness: 0.25 })
+                );
+                pad.position.set(yc.x, 0.1, yc.z);
+                arena3D.boardGroup.add(pad);
+
+                const innerDark = new THREE.Mesh(
+                    new THREE.BoxGeometry(4.2, 0.24, 4.2),
+                    new THREE.MeshStandardMaterial({ color: 0x090d16, metalness: 0.8, roughness: 0.2 })
+                );
+                innerDark.position.set(yc.x, 0.11, yc.z);
+                arena3D.boardGroup.add(innerDark);
+            });
+
+            // Central 3x3 Quantum Core & Floating Crystal Pyramid
+            const corePad = new THREE.Mesh(
+                new THREE.BoxGeometry(2.9, 0.24, 2.9),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.15 })
+            );
+            corePad.position.set(0, 0.12, 0);
+            arena3D.boardGroup.add(corePad);
+
+            arena3D.coreCrystal = new THREE.Mesh(
+                new THREE.OctahedronGeometry(0.95, 0),
+                new THREE.MeshStandardMaterial({
+                    color: 0x22d3ee,
+                    emissive: 0x0284c7,
+                    emissiveIntensity: 0.7,
+                    wireframe: false,
+                    metalness: 0.9,
+                    roughness: 0.1
+                })
+            );
+            arena3D.coreCrystal.position.set(0, 1.35, 0);
+            arena3D.boardGroup.add(arena3D.coreCrystal);
+        }
+
+        function build3DHoloDice() {
+            // Create 6 crisp canvas textures for dice faces 1..6
+            const faceMaterials = [1, 6, 2, 5, 3, 4].map(num => {
+                const c = document.createElement('canvas');
+                c.width = 128; c.height = 128;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#090d16';
+                ctx.fillRect(0, 0, 128, 128);
+                ctx.strokeStyle = '#22d3ee';
+                ctx.lineWidth = 8;
+                ctx.strokeRect(4, 4, 120, 120);
+
+                ctx.fillStyle = num === 6 ? '#fbbf24' : '#38bdf8';
+                ctx.font = '900 64px Orbitron, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(num), 64, 68);
+
+                const tex = new THREE.CanvasTexture(c);
+                return new THREE.MeshStandardMaterial({ map: tex, metalness: 0.4, roughness: 0.2 });
+            });
+
+            arena3D.diceMesh = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.35, 1.35), faceMaterials);
+            arena3D.diceMesh.position.set(0, 3.1, 0);
+            arena3D.scene.add(arena3D.diceMesh);
+        }
+
+        function createPlasmaTokenMesh(threeColor, emissiveColor) {
+            const group = new THREE.Group();
+
+            // Metallic Pedestal Base
+            const base = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.32, 0.38, 0.24, 24),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 })
+            );
+            base.position.y = 0.12;
+            group.add(base);
+
+            // Neon Core Spire
+            const spire = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.16, 0.28, 0.58, 24),
+                new THREE.MeshStandardMaterial({
+                    color: threeColor,
+                    emissive: emissiveColor,
+                    emissiveIntensity: 0.5,
+                    metalness: 0.7,
+                    roughness: 0.15
+                })
+            );
+            spire.position.y = 0.48;
+            group.add(spire);
+
+            // Floating Energy Orb Crown
+            const orb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.22, 20, 20),
+                new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    emissive: threeColor,
+                    emissiveIntensity: 0.85
+                })
+            );
+            orb.position.y = 0.92;
+            group.add(orb);
+
+            // Selection Halo Ring (hidden unless selectable)
+            const halo = new THREE.Mesh(
+                new THREE.RingGeometry(0.42, 0.54, 24),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+            );
+            halo.rotation.x = -Math.PI / 2;
+            halo.position.y = 0.04;
+            halo.visible = false;
+            group.add(halo);
+
+            return { group, halo };
+        }
+
+        function clearAll3DTokens() {
+            arena3D.tokenMeshes.forEach(m => arena3D.scene.remove(m));
+            arena3D.tokenMeshes = [];
+        }
+
+        function spawnDemoShowcaseTokens() {
+            clearAll3DTokens();
+            PLAYER_CONFIGS.forEach(cfg => {
+                cfg.yardCoords.forEach(([r, c]) => {
+                    const { group } = createPlasmaTokenMesh(cfg.threeColor, cfg.emissive);
+                    group.position.set(c - 7, 0.2, r - 7);
+                    arena3D.scene.add(group);
+                    arena3D.tokenMeshes.push(group);
+                });
+            });
+        }
+
+        function spawnAll3DPlayerTokens() {
+            clearAll3DTokens();
+            game.players.forEach((pl, pIdx) => {
+                pl.tokens.forEach(tok => {
+                    const { group, halo } = createPlasmaTokenMesh(pl.threeColor, pl.emissive);
+                    group.userData = { playerIdx: pIdx, tokenId: tok.id };
+                    tok.mesh = group;
+                    tok.ringMesh = halo;
+                    const pos = getTokenWorldPosition(pl, tok);
+                    group.position.set(pos.x, pos.y, pos.z);
+                    arena3D.scene.add(group);
+                    arena3D.tokenMeshes.push(group);
+                });
+            });
+        }
+
+        function getTokenWorldPosition(player, token) {
+            if (token.progress === -1) {
+                const [r, c] = player.yardCoords[token.id];
+                return { x: c - 7, y: 0.22, z: r - 7 };
+            }
+            if (token.progress >= 0 && token.progress <= 50) {
+                const mainIdx = (player.startMainIdx + token.progress) % 52;
+                const [r, c] = MAIN_TRACK[mainIdx];
+                // Slight offset if sharing a tile with friendly tokens
+                const offset = (token.id - 1.5) * 0.08;
+                return { x: (c - 7) + offset, y: 0.16, z: (r - 7) + offset };
+            }
+            // Home stretch (51..56)
+            const stretchIdx = Math.min(5, token.progress - 51);
+            const [r, c] = player.homeStretch[stretchIdx];
+            const offset = (token.id - 1.5) * 0.1;
+            return { x: (c - 7) + offset, y: token.progress === 56 ? 0.35 : 0.16, z: (r - 7) + offset };
+        }
+
+        function animateTokenToBoardCoord(player, token, onDone = null) {
+            if (!token.mesh) { if (onDone) onDone(); return; }
+            const target = getTokenWorldPosition(player, token);
+            const start = token.mesh.position.clone();
+            let frame = 0;
+            const totalFrames = 10;
+
+            function step() {
+                frame++;
+                const t = frame / totalFrames;
+                token.mesh.position.x = start.x + (target.x - start.x) * t;
+                token.mesh.position.z = start.z + (target.z - start.z) * t;
+                token.mesh.position.y = start.y + (target.y - start.y) * t + Math.sin(t * Math.PI) * 0.65;
+                if (frame < totalFrames) {
+                    requestAnimationFrame(step);
+                } else {
+                    token.mesh.position.set(target.x, target.y, target.z);
+                    if (onDone) onDone();
+                }
+            }
+            step();
+        }
+
+        function highlightSelectableTokens(player, validIds) {
+            player.tokens.forEach(tok => {
+                if (tok.ringMesh) tok.ringMesh.visible = validIds.includes(tok.id);
+            });
+        }
+
+        function clearTokenHighlights() {
+            game.players.forEach(pl => {
+                pl.tokens.forEach(tok => {
+                    if (tok.ringMesh) tok.ringMesh.visible = false;
+                });
+            });
+        }
+
+        function handleCanvasTapRayCast(clientX, clientY) {
+            if (!game.inMatch || game.phase !== 'SELECT_TOKEN') return;
+            const rect = arena3D.renderer.domElement.getBoundingClientRect();
+            arena3D.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            arena3D.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            arena3D.raycaster.setFromCamera(arena3D.mouse, arena3D.camera);
+            const hits = arena3D.raycaster.intersectObjects(arena3D.tokenMeshes, true);
+            for (const h of hits) {
+                let obj = h.object;
+                while (obj && obj.userData.playerIdx === undefined) {
+                    obj = obj.parent;
+                }
+                if (obj && obj.userData.playerIdx !== undefined) {
+                    on3DTokenClicked(obj.userData.playerIdx, obj.userData.tokenId);
+                    return;
+                }
+            }
+        }
+
+        function spawn3DBurst(x, y, z, colorHex, count) {
+            const geo = new THREE.OctahedronGeometry(0.16, 0);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            for (let i = 0; i < count; i++) {
+                const m = new THREE.Mesh(geo, mat);
+                m.position.set(x, y, z);
+                arena3D.scene.add(m);
+                arena3D.bursts.push({
+                    mesh: m,
+                    vx: (Math.random() - 0.5) * 0.25,
+                    vy: Math.random() * 0.24 + 0.06,
+                    vz: (Math.random() - 0.5) * 0.25,
+                    life: 45
+                });
+            }
+        }
+
+        function cycleCameraPreset() {
+            NeonSFX.click();
+            arena3D.camPreset = (arena3D.camPreset + 1) % 2;
+            if (arena3D.camPreset === 0) {
+                arena3D.camHeight = 15.5;
+                arena3D.camRadius = 14.5;
+                document.getElementById('cam-preset-label').textContent = '3D Orbit';
+            } else {
+                arena3D.camHeight = 22.5;
+                arena3D.camRadius = 3.2;
+                document.getElementById('cam-preset-label').textContent = 'Top-Down';
+            }
+        }
+
+        function animateThreeScene() {
+            requestAnimationFrame(animateThreeScene);
+            if (!arena3D.renderer) return;
+
+            if (!game.inMatch && !arena3D.isDragging) {
+                arena3D.camAngle += 0.0035;
+            }
+
+            arena3D.camera.position.x = Math.sin(arena3D.camAngle) * arena3D.camRadius;
+            arena3D.camera.position.z = Math.cos(arena3D.camAngle) * arena3D.camRadius;
+            arena3D.camera.position.y = arena3D.camHeight;
+            arena3D.camera.lookAt(0, 0, 0);
+
+            // Rotate central Quantum Core Crystal
+            if (arena3D.coreCrystal) {
+                arena3D.coreCrystal.rotation.y += 0.02;
+                arena3D.coreCrystal.position.y = 1.35 + Math.sin(Date.now() * 0.003) * 0.14;
+            }
+
+            // Animate 3D Holographic Dice
+            if (arena3D.diceMesh) {
+                if (arena3D.diceSpinTimer > 0) {
+                    arena3D.diceSpinTimer--;
+                    arena3D.diceMesh.rotation.x += 0.34;
+                    arena3D.diceMesh.rotation.y += 0.41;
+                    arena3D.diceMesh.position.y = 3.2 + Math.sin((arena3D.diceSpinTimer / 28) * Math.PI) * 1.4;
+                } else {
+                    arena3D.diceMesh.position.y = 3.05 + Math.sin(Date.now() * 0.0035) * 0.12;
+                    arena3D.diceMesh.rotation.y += 0.008;
+                }
+            }
+
+            // Pulse selectable token halos
+            game.players.forEach(pl => {
+                pl.tokens.forEach(tok => {
+                    if (tok.ringMesh && tok.ringMesh.visible) {
+                        const s = 1 + Math.sin(Date.now() * 0.01) * 0.22;
+                        tok.ringMesh.scale.set(s, s, 1);
+                    }
+                });
+            });
+
+            // Update explosion particles
+            for (let i = arena3D.bursts.length - 1; i >= 0; i--) {
+                const b = arena3D.bursts[i];
+                b.mesh.position.x += b.vx;
+                b.mesh.position.y += b.vy;
+                b.mesh.position.z += b.vz;
+                b.vy -= 0.008;
+                b.life--;
+                if (b.life <= 0) {
+                    arena3D.scene.remove(b.mesh);
+                    arena3D.bursts.splice(i, 1);
+                }
+            }
+
+            arena3D.renderer.render(arena3D.scene, arena3D.camera);
+        }
+
+        // Spacebar shortcut for rolling 3D dice
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && game.inMatch && game.phase === 'WAIT_ROLL') {
+                if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+                e.preventDefault();
+                handleRollDiceClick();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (!arena3D.renderer || !arena3D.camera) return;
+            const w = window.innerWidth || 800;
+            const h = window.innerHeight || 600;
+            arena3D.camera.aspect = w / h;
+            arena3D.camera.updateProjectionMatrix();
+            arena3D.renderer.setSize(w, h);
+        });
+
+        window.onload = function () {
+            initThreeArena();
+            animateThreeScene();
+
+            const params = new URLSearchParams(window.location.search);
+            const r = params.get('room');
+            if (r) {
+                stateModeSwitch('webrtc');
+                document.getElementById('input-join-code').value = r.toUpperCase().slice(0, 6);
+                showLobbyToast(`Invite Link detected for Room ${r.toUpperCase()}! Click Connect & Enter Arena.`);
+            }
+        };
+    </script>
+</body>
+</html>
